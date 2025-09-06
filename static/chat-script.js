@@ -1598,26 +1598,60 @@ Ready to start creating? Try any command or just tell me what you'd like to do! 
     addMessageToHistory("Welcome message with features and commands", "bot");
 }
 
-// Function to auto-clear and show welcome on every visit
-function autoFreshStart() {
-    // Always clear all localStorage data on every visit
-    localStorage.clear();
-    console.log('Auto-clearing all cache and history for fresh start');
-    
-    // Reset chat interface
+// Function to clear chat interface
+function clearChatInterface() {
     chatHistory = [];
     chatWindow.innerHTML = '';
     lastGeneratedImage = null;
-    
-    // Reset to default model
     currentModel = "gemini-2.0-flash";
     selectedModelName.textContent = GEMINI_MODELS[currentModel];
-    
-    // Repopulate model dropdown to ensure it works
     populateModelDropdown();
-    
-    // Always show welcome message for fresh start
-    showWelcomeMessage();
+}
+
+// Function to show welcome message with features and commands
+function showWelcomeMessage() {
+    const welcomeMessage = `# Welcome to Advanced AI Chat! ✨
+
+I'm here to help you with **text conversations**, **image generation**, **image analysis**, and **image editing**. Here are all the features and commands available:
+
+## 🎨 **Image Generation Commands**
+- \`/img [description]\` - Generate images
+- \`/gen [description]\` - Generate images  
+- \`/generate [description]\` - Generate images
+- \`"generate an image of [description]"\` - Natural language
+- \`"create an image of [description]"\` - Natural language
+- \`"make an image of [description]"\` - Natural language
+
+## ✏️ **Image Editing Commands**
+- \`/edit [instruction]\` - Edit the last generated image
+- \`"edit the image [instruction]"\` - Natural language
+- Click the **Edit** button on any generated image
+- Upload an image and use edit commands
+
+## 💬 **Chat Features**
+- **Multi-Model Support**: Switch between Gemini models using the dropdown
+- **Image Upload**: Click the upload button to analyze images
+- **Chat History**: Your conversations are automatically saved
+- **Code Highlighting**: Code blocks are automatically formatted
+- **Time Queries**: Ask for time in different countries
+- **Date Calculations**: Calculate future/past dates
+
+## 🌍 **Special Commands**
+- Ask about time: \`"What time is it in London?"\`
+- Date calculations: \`"What day will it be 30 days from now?"\`
+- Image analysis: Upload any image and ask questions about it
+- Multi-language support: Works in English and Bengali
+
+## 🎯 **Pro Tips**
+- **Chain Operations**: Generate an image, then edit it multiple times
+- **Detailed Prompts**: More specific descriptions = better results
+- **Model Selection**: Try different Gemini models for various tasks
+- **Upload + Edit**: Upload your own images and edit them with AI
+
+Ready to start creating? Try any command or just tell me what you'd like to do! 🚀`;
+
+    displayMessage(welcomeMessage, "bot");
+    addMessageToHistory("Welcome message with features and commands", "bot");
 }
 
 // Chat history functionality
@@ -1666,43 +1700,47 @@ function saveChatHistory() {
 
 function loadChatHistory() {
     const savedChatHtml = localStorage.getItem("chat-history-html");
-    if (savedChatHtml) {
-        chatWindow.innerHTML = savedChatHtml;
-        // Re-highlight code blocks after loading from local storage
-        chatWindow.querySelectorAll("pre code").forEach((block) => {
-            hljs.highlightElement(block);
-            const copyButton =
-                block.parentElement.querySelector(".copy-button");
-            if (copyButton) {
-                copyButton.onclick = () => {
-                    navigator.clipboard
-                        .writeText(block.textContent)
-                        .then(() => {
-                            copyButton.innerText = "Copied!";
-                            setTimeout(
-                                () => (copyButton.innerText = "Copy"),
-                                2000,
-                            );
-                        });
-                };
-            }
-        });
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
-
     const savedChatData = localStorage.getItem("chat-history-data");
-    if (savedChatData) {
-        chatHistory = JSON.parse(savedChatData);
-    }
-
     const savedModel = localStorage.getItem("selected-model");
-    if (savedModel && GEMINI_MODELS[savedModel]) {
-        currentModel = savedModel;
-        selectedModelName.textContent = GEMINI_MODELS[savedModel];
-    } else {
-        selectedModelName.textContent = GEMINI_MODELS[currentModel];
+
+    if (savedChatHtml && savedChatData) {
+        // Prompt user to restore history
+        const restore = confirm("Do you want to restore your previous chat history?");
+        if (restore) {
+            chatWindow.innerHTML = savedChatHtml;
+            chatHistory = JSON.parse(savedChatData);
+            
+            // Re-highlight code blocks after loading from local storage
+            chatWindow.querySelectorAll("pre code").forEach((block) => {
+                hljs.highlightElement(block);
+                const copyButton = block.parentElement.querySelector(".copy-button");
+                if (copyButton) {
+                    copyButton.onclick = () => {
+                        navigator.clipboard.writeText(block.textContent).then(() => {
+                            copyButton.innerText = "Copied!";
+                            setTimeout(() => (copyButton.innerText = "Copy"), 2000);
+                        });
+                    };
+                }
+            });
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            if (savedModel && GEMINI_MODELS[savedModel]) {
+                currentModel = savedModel;
+                selectedModelName.textContent = GEMINI_MODELS[savedModel];
+            } else {
+                selectedModelName.textContent = GEMINI_MODELS[currentModel];
+            }
+            populateModelDropdown();
+            return true; // History restored
+        }
     }
-    populateModelDropdown();
+    
+    // If no history or user declined, clear and show welcome
+    clearAllStorage(); // Clear any partial or old history
+    clearChatInterface();
+    showWelcomeMessage();
+    return false; // History not restored
 }
 
 // Global error handler to prevent unhandled promise rejections
@@ -1738,13 +1776,23 @@ const currentSize = getStorageSize();
 const sizeMB = (currentSize / (1024 * 1024)).toFixed(2);
 console.log(`Initial storage usage: ${sizeMB}MB / 20MB`);
 
-// Don't load chat history since we auto-clear everything
-// loadChatHistory(); // Commented out since we always start fresh
+// Load chat history or show welcome message
+document.addEventListener('DOMContentLoaded', () => {
+    if (!loadChatHistory()) {
+        // If history was not loaded (either none or user declined), ensure a fresh start
+        clearChatInterface();
+        showWelcomeMessage();
+    }
+    adjustTextareaHeight();
+    toggleSendButton();
+});
 
-// Always auto-clear and show welcome on every visit
-setTimeout(() => {
-    autoFreshStart();
-}, 500); // Small delay to ensure page is ready
+// Automatically save chat history before closing or navigating away
+window.addEventListener('beforeunload', () => {
+    if (chatHistory.length > 0) {
+        saveChatHistory();
+    }
+});
 
 // Initial adjustments
 adjustTextareaHeight();
