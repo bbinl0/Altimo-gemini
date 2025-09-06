@@ -1134,4 +1134,19 @@ body.dark-mode .uploaded-image-container .edit-btn:hover {
     #image-upload-button .remove-image-mobile {
         display: none !important; /* Hide mobile remove icon on larger screens */
     }
+    
+    /* Reset desktop image preview container display (hidden by default) */
+    #image-preview-container {
+        display: none; /* Hidden by default, shown when has-image class is added */
+    }
+    
+    /* Show desktop image preview container when image is selected */
+    #image-preview-container.has-image {
+        display: flex !important; /* Show when image is selected */
+    }
+    
+    /* Show desktop remove button when image is present */
+    #image-preview-container.has-image #remove-image-button {
+        display: flex !important;
+    }
 }
