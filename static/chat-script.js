@@ -47,6 +47,7 @@ const imagePreviewContainer = document.getElementById(
 );
 const imagePreview = document.getElementById("image-preview");
 const removeImageButton = document.getElementById("remove-image-button");
+const removeImageMobile = document.getElementById("remove-image-mobile");
 
 const BASE_URL = ""; // Use relative path for production
 
@@ -64,9 +65,6 @@ let chatHistory = []; // To store chat history for context
 let lastGeneratedImage = null; // Store last generated image for editing
 let userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // Auto-detect user timezone
 
-// Storage management constants
-const MAX_STORAGE_SIZE = 20 * 1024 * 1024; // 20MB in bytes
-let storageCheckInterval = null;
 
 // Function to parse code blocks and highlight them
 function parseCodeBlocks(message) {
@@ -627,7 +625,7 @@ function displayMessage(
         }
     });
 
-    saveChatHistory();
+
 }
 
 // Function to add message to chat history array
@@ -1199,7 +1197,6 @@ async function sendMessage(prompt, imageFile = null) {
         if (timeResponse) {
             displayMessage(timeResponse, "bot");
             addMessageToHistory(timeResponse, "bot");
-            clearInputs();
             return;
         }
     }
@@ -1208,7 +1205,6 @@ async function sendMessage(prompt, imageFile = null) {
     if (!imageFile && isImageGenerationRequest(prompt)) {
         const imagePrompt = extractImagePrompt(prompt);
         await generateImage(imagePrompt);
-        clearInputs();
         return;
     }
 
@@ -1216,7 +1212,6 @@ async function sendMessage(prompt, imageFile = null) {
     if (imageFile && isImageEditRequest(prompt, true)) {
         const editPrompt = extractEditPrompt(prompt);
         await editUploadedImage(editPrompt, imageFile);
-        clearInputs();
         return;
     }
 
@@ -1231,7 +1226,6 @@ async function sendMessage(prompt, imageFile = null) {
             editPrompt,
             window.currentUploadedImageForEdit.src,
         );
-        clearInputs();
         return;
     }
 
@@ -1239,7 +1233,6 @@ async function sendMessage(prompt, imageFile = null) {
     if (!imageFile && isImageEditRequest(prompt) && lastGeneratedImage) {
         const editPrompt = extractEditPrompt(prompt);
         await editImage(editPrompt);
-        clearInputs();
         return;
     }
 
@@ -1308,7 +1301,6 @@ async function sendMessage(prompt, imageFile = null) {
         // Don't block the interface - continue processing
         return;
     }
-    clearInputs();
 }
 
 // Event listener for send button
@@ -1335,11 +1327,19 @@ sendButton.addEventListener("click", async () => {
                     ? "Image uploaded (auto-analyzing)"
                     : prompt;
             displayMessage(displayPrompt, "user", e.target.result);
+            
+            // Clear inputs immediately after displaying the message
+            clearInputs();
+            
             sendMessage(prompt, imageFile);
         };
         reader.readAsDataURL(imageFile);
     } else {
         displayMessage(prompt, "user");
+        
+        // Clear inputs immediately after displaying the message
+        clearInputs();
+        
         sendMessage(prompt);
     }
 });
@@ -1377,6 +1377,8 @@ imageInput.addEventListener("change", (event) => {
         reader.onload = function (e) {
             imagePreview.src = e.target.result;
             imagePreviewContainer.style.display = "flex"; // Show the preview
+            imagePreviewContainer.classList.add("has-image"); // Add class for desktop remove button
+            imageUploadButton.classList.add("has-image"); // Add class for mobile remove button
             adjustTextareaHeight(); // Adjust textarea height when image is added
             toggleSendButton(); // Check send button visibility
         };
@@ -1384,17 +1386,33 @@ imageInput.addEventListener("change", (event) => {
     } else {
         imagePreview.src = "#";
         imagePreviewContainer.style.display = "none"; // Hide if no file
+        imagePreviewContainer.classList.remove("has-image"); // Remove class for desktop remove button
+        imageUploadButton.classList.remove("has-image"); // Remove class for mobile remove button
         adjustTextareaHeight(); // Adjust textarea height when image is removed
         toggleSendButton(); // Check send button visibility
     }
 });
 
-// Event listener for remove image button
-removeImageButton.addEventListener("click", () => {
+// Function to remove image (shared by both desktop and mobile)
+function removeImage() {
     imageInput.value = ""; // Clear the selected file
     imagePreview.src = "#";
     imagePreviewContainer.style.display = "none"; // Hide the preview
+    imagePreviewContainer.classList.remove("has-image"); // Remove class for desktop remove button
+    imageUploadButton.classList.remove("has-image"); // Remove class for mobile remove button
+    adjustTextareaHeight(); // Adjust textarea height
     toggleSendButton(); // Check send button visibility
+}
+
+// Event listener for desktop remove image button
+removeImageButton.addEventListener("click", () => {
+    removeImage();
+});
+
+// Event listener for mobile remove image button
+removeImageMobile.addEventListener("click", (e) => {
+    e.stopPropagation(); // Prevent triggering the upload button click
+    removeImage();
 });
 
 // Event listener for clear input button
@@ -1408,6 +1426,8 @@ function clearInputs() {
     imageInput.value = "";
     imagePreview.src = "#";
     imagePreviewContainer.style.display = "none";
+    imagePreviewContainer.classList.remove("has-image"); // Remove class for desktop remove button
+    imageUploadButton.classList.remove("has-image"); // Remove class for mobile remove button
     adjustTextareaHeight(); // Reset textarea height
     toggleSendButton(); // Hide send button
 }
@@ -1460,7 +1480,6 @@ function populateModelDropdown() {
             modelDisplay.querySelector(".dropdown-icon").style.transform =
                 "rotate(0deg)";
             updateSelectedModelInDropdown();
-            saveChatHistory(); // Save chat history after model change
         });
         modelDropdown.appendChild(modelItem);
     }
@@ -1487,70 +1506,6 @@ document.addEventListener("click", (event) => {
     }
 });
 
-// Storage management functions
-// Function to get current localStorage usage in bytes
-function getStorageSize() {
-    let total = 0;
-    for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-            total += localStorage[key].length + key.length;
-        }
-    }
-    return total;
-}
-
-// Function to clear all localStorage data
-function clearAllStorage() {
-    localStorage.clear();
-    console.log('All localStorage data cleared due to 20MB size limit');
-    
-    // Reset chat interface
-    chatHistory = [];
-    chatWindow.innerHTML = '';
-    lastGeneratedImage = null;
-    
-    // Show notification to user
-    displayMessage('Storage limit reached (20MB). All chat history and cache have been automatically cleared to free up space.', 'bot');
-    
-    // Reset to default model
-    currentModel = "gemini-2.0-flash";
-    selectedModelName.textContent = GEMINI_MODELS[currentModel];
-    
-    // Show welcome message again since this is a fresh start
-    setTimeout(() => {
-        showWelcomeMessage();
-    }, 2000); // Show welcome after storage clear notification
-}
-
-// Function to monitor storage usage
-function checkStorageSize() {
-    const currentSize = getStorageSize();
-    const sizeMB = (currentSize / (1024 * 1024)).toFixed(2);
-    
-    if (currentSize >= MAX_STORAGE_SIZE) {
-        console.warn(`Storage limit exceeded: ${sizeMB}MB. Clearing all data automatically.`);
-        clearAllStorage();
-        return true; // Indicates storage was cleared
-    }
-    return false;
-}
-
-// Function to start automatic storage monitoring
-function startStorageMonitoring() {
-    // Check immediately
-    checkStorageSize();
-    
-    // Check every 10 seconds
-    if (storageCheckInterval) {
-        clearInterval(storageCheckInterval);
-    }
-    
-    storageCheckInterval = setInterval(() => {
-        checkStorageSize();
-    }, 10000); // Check every 10 seconds
-    
-    console.log('Automatic storage monitoring started (20MB limit, checking every 10 seconds)');
-}
 
 // Function to show welcome message with features and commands
 function showWelcomeMessage() {
@@ -1575,7 +1530,7 @@ I'm here to help you with **text conversations**, **image generation**, **image 
 ## 💬 **Chat Features**
 - **Multi-Model Support**: Switch between Gemini models using the dropdown
 - **Image Upload**: Click the upload button to analyze images
-- **Chat History**: Your conversations are automatically saved
+- **Chat History**: Your conversations are kept during the session
 - **Code Highlighting**: Code blocks are automatically formatted
 - **Time Queries**: Ask for time in different countries
 - **Date Calculations**: Calculate future/past dates
@@ -1631,7 +1586,7 @@ I'm here to help you with **text conversations**, **image generation**, **image 
 ## 💬 **Chat Features**
 - **Multi-Model Support**: Switch between Gemini models using the dropdown
 - **Image Upload**: Click the upload button to analyze images
-- **Chat History**: Your conversations are automatically saved
+- **Chat History**: Your conversations are kept during the session
 - **Code Highlighting**: Code blocks are automatically formatted
 - **Time Queries**: Ask for time in different countries
 - **Date Calculations**: Calculate future/past dates
@@ -1654,94 +1609,6 @@ Ready to start creating? Try any command or just tell me what you'd like to do! 
     addMessageToHistory("Welcome message with features and commands", "bot");
 }
 
-// Chat history functionality
-function saveChatHistory() {
-    // Check storage size before saving
-    if (checkStorageSize()) {
-        return; // Storage was cleared, don't try to save
-    }
-    
-    try {
-        // Limit chat history HTML to prevent quota exceeded
-        const htmlContent = chatWindow.innerHTML;
-        if (htmlContent.length > 50000) {
-            // If too large, only save last part
-            const messages = chatWindow.querySelectorAll('.message');
-            if (messages.length > 10) {
-                // Keep only last 10 messages
-                const recentMessages = Array.from(messages).slice(-10);
-                const tempDiv = document.createElement('div');
-                recentMessages.forEach(msg => tempDiv.appendChild(msg.cloneNode(true)));
-                localStorage.setItem("chat-history-html", tempDiv.innerHTML);
-            } else {
-                localStorage.setItem("chat-history-html", htmlContent);
-            }
-        } else {
-            localStorage.setItem("chat-history-html", htmlContent);
-        }
-        
-        // Limit chat history data
-        const limitedHistory = chatHistory.slice(-20); // Keep only last 20 messages
-        localStorage.setItem("chat-history-data", JSON.stringify(limitedHistory));
-        localStorage.setItem("selected-model", currentModel);
-        
-        // Check size after saving
-        checkStorageSize();
-        
-    } catch (error) {
-        if (error.name === 'QuotaExceededError') {
-            console.warn('LocalStorage quota exceeded during save, clearing all data');
-            clearAllStorage();
-        } else {
-            console.error('Error saving chat history:', error);
-        }
-    }
-}
-
-function loadChatHistory() {
-    const savedChatHtml = localStorage.getItem("chat-history-html");
-    const savedChatData = localStorage.getItem("chat-history-data");
-    const savedModel = localStorage.getItem("selected-model");
-
-    if (savedChatHtml && savedChatData) {
-        // Prompt user to restore history
-        const restore = confirm("Do you want to restore your previous chat history?");
-        if (restore) {
-            chatWindow.innerHTML = savedChatHtml;
-            chatHistory = JSON.parse(savedChatData);
-            
-            // Re-highlight code blocks after loading from local storage
-            chatWindow.querySelectorAll("pre code").forEach((block) => {
-                hljs.highlightElement(block);
-                const copyButton = block.parentElement.querySelector(".copy-button");
-                if (copyButton) {
-                    copyButton.onclick = () => {
-                        navigator.clipboard.writeText(block.textContent).then(() => {
-                            copyButton.innerText = "Copied!";
-                            setTimeout(() => (copyButton.innerText = "Copy"), 2000);
-                        });
-                    };
-                }
-            });
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            if (savedModel && GEMINI_MODELS[savedModel]) {
-                currentModel = savedModel;
-                selectedModelName.textContent = GEMINI_MODELS[savedModel];
-            } else {
-                selectedModelName.textContent = GEMINI_MODELS[currentModel];
-            }
-            populateModelDropdown();
-            return true; // History restored
-        }
-    }
-    
-    // If no history or user declined, clear and show welcome
-    clearAllStorage(); // Clear any partial or old history
-    clearChatInterface();
-    showWelcomeMessage();
-    return false; // History not restored
-}
 
 // Global error handler to prevent unhandled promise rejections
 window.addEventListener("unhandledrejection", function (event) {
@@ -1767,32 +1634,17 @@ window.addEventListener("error", function (event) {
     event.preventDefault();
 });
 
-// Initialize with storage monitoring
+// Initialize theme preference
 loadThemePreference();
-startStorageMonitoring();
 
-// Display current storage usage
-const currentSize = getStorageSize();
-const sizeMB = (currentSize / (1024 * 1024)).toFixed(2);
-console.log(`Initial storage usage: ${sizeMB}MB / 20MB`);
-
-// Load chat history or show welcome message
+// Show welcome message on load
 document.addEventListener('DOMContentLoaded', () => {
-    if (!loadChatHistory()) {
-        // If history was not loaded (either none or user declined), ensure a fresh start
-        clearChatInterface();
-        showWelcomeMessage();
-    }
+    clearChatInterface();
+    showWelcomeMessage();
     adjustTextareaHeight();
     toggleSendButton();
 });
 
-// Automatically save chat history before closing or navigating away
-window.addEventListener('beforeunload', () => {
-    if (chatHistory.length > 0) {
-        saveChatHistory();
-    }
-});
 
 // Initial adjustments
 adjustTextareaHeight();
