@@ -2035,7 +2035,7 @@ body.dark-mode .uploaded-image-container .edit-btn:hover {
     }
     
     .input-area-wrapper {
-        padding-right: 45px;
+        padding-right: 30px;
         min-height: 40px;
     }
 
@@ -2075,7 +2075,7 @@ body.dark-mode .uploaded-image-container .edit-btn:hover {
     }
     
     .input-area-wrapper {
-        padding-right: 45px; /* Reduced for better spacing */
+        padding-right: 30px; /* Reduced for better spacing */
         min-height: 36px; /* Reduced height */
         border: 1px solid #cccccc; /* Consistent border */
     }
