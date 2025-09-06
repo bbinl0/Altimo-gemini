@@ -7,7 +7,6 @@ Designed for Vercel deployment with serverless functions.
 """
 
 import os
-from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from gemini_all_for_one import (
     GeminiChatClient, 
@@ -16,8 +15,6 @@ from gemini_all_for_one import (
     ImageGenerator,
     ImageEditor
 )
-
-load_dotenv()
 # Simple Gemini functionality
 import google.genai as genai
 
@@ -33,9 +30,9 @@ def static_files(filename):
 # Initialize AI clients
 try:
     pollinations_client = PollinationsClient()
-    print("Pollinations client initialized")
+    print("✅ Pollinations client initialized")
 except Exception as e:
-    print(f"Pollinations client error: {e}")
+    print(f"❌ Pollinations client error: {e}")
     pollinations_client = None
 
 # Simple Gemini client using direct API
@@ -44,11 +41,11 @@ gemini_client = None
 if os.environ.get('GEMINI_API_KEY'):
     try:
         gemini_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
-        print("Direct Gemini client initialized")
+        print("✅ Direct Gemini client initialized")
     except Exception as e:
-        print(f"Direct Gemini client error: {e}")
+        print(f"❌ Direct Gemini client error: {e}")
 else:
-    print("GEMINI_API_KEY not set - Gemini features disabled")
+    print("⚠️ GEMINI_API_KEY not set - Gemini features disabled")
 
 @app.route('/')
 def home():
