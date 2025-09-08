@@ -50,7 +50,7 @@ else:
 @app.route('/')
 def home():
     """Home page with simple interface."""
-    return render_template('index.html'
+    return render_template('index.html')
 
 @app.route('/api/health')
 def health():
